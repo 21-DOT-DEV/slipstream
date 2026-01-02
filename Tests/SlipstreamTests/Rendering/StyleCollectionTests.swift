@@ -199,4 +199,81 @@ final class StyleCollectionTests {
         #expect(uniqueComponents.count == 1)
         #expect(uniqueComponents[0].componentName == "DupeA")
     }
+    
+    // MARK: - Tests: View Wrapper Traversal (Regression Tests)
+    
+    @Test("style() traverses through AttributeModifierView")
+    func styleTraversesThroughAttributeModifier() async throws {
+        // This is a regression test for the bug where AttributeModifierView
+        // was missing a style() method, causing CSS collection to stop
+        // at any view with attributes (like .language(), .id(), etc.)
+        
+        struct NestedInAttribute: View {
+            var body: some View {
+                Div {
+                    SimpleComponent()
+                }
+                .language("en")  // This wraps in AttributeModifierView
+            }
+        }
+        
+        let components = try await renderAndCollectCSS(view: NestedInAttribute())
+        
+        // SimpleComponent should be found even though it's inside AttributeModifierView
+        #expect(components.count == 1)
+        #expect(components[0].componentName == "SimpleComponent")
+    }
+    
+    @Test("style() traverses through multiple nested wrapper views")
+    func styleTraversesThroughMultipleWrappers() async throws {
+        // Integration test: StyleModifier deeply nested in multiple wrapper types
+        // should still be collected. This catches future bugs in any view type.
+        
+        struct DeeplyNested: View {
+            let showComponent: Bool = true
+            
+            var body: some View {
+                Div {
+                    if showComponent {
+                        Div {
+                            SimpleComponent()
+                        }
+                        .id("inner")
+                        .language("en")
+                    }
+                }
+                .id("outer")
+            }
+        }
+        
+        let components = try await renderAndCollectCSS(view: DeeplyNested())
+        
+        // SimpleComponent should be found through:
+        // DeeplyNested -> Div (AttributeModifier[id]) -> ConditionalView -> 
+        // Div (AttributeModifier[id]) -> AttributeModifier[language] -> SimpleComponent
+        #expect(components.count == 1)
+        #expect(components[0].componentName == "SimpleComponent")
+    }
+    
+    @Test("style() traverses through ForEach with attributes")
+    func styleTraversesThroughForEachWithAttributes() async throws {
+        struct ListWithComponents: View {
+            var body: some View {
+                Div {
+                    ForEach(["a", "b"], id: \.self) { item in
+                        ComponentWithRuntimeValue(id: item, count: 1)
+                    }
+                }
+                .id("list")
+            }
+        }
+        
+        let components = try await renderAndCollectCSS(view: ListWithComponents())
+        
+        // Both components from ForEach should be collected
+        #expect(components.count == 2)
+        let names = components.map { $0.componentName }
+        #expect(names.contains("Component[a]"))
+        #expect(names.contains("Component[b]"))
+    }
 }
