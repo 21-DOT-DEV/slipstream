@@ -42,4 +42,13 @@ struct PaddingTests {
         )) == #"<div class="pt-0 md:pr-1"></div>"#
     )
   }
+
+  @Test func smallBreakpointProducesNoPrefix() throws {
+    // .small is treated as the base case in Tailwind's mobile-first model,
+    // so it should produce no prefix (not a stray colon like ":px-2")
+    try #expect(
+      renderHTML(Div {}.padding(.horizontal, 8, condition: .startingAt(.small)))
+        == #"<div class="px-2"></div>"#
+    )
+  }
 }

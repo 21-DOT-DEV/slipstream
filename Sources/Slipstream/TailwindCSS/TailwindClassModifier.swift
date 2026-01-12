@@ -51,7 +51,12 @@ private struct TailwindClassModifierView<Content: View>: View {
     for child in shadowDOM.children() {
       for className in classNames.sorted() {
         if let condition {
-          try child.addClass("\(condition.tailwindClassModifiers):\(className)")
+          let modifiers = condition.tailwindClassModifiers
+          if modifiers.isEmpty {
+            try child.addClass(className)
+          } else {
+            try child.addClass("\(modifiers):\(className)")
+          }
         } else {
           try child.addClass(className)
         }
